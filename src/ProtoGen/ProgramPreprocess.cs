@@ -199,28 +199,29 @@ namespace Google.ProtocolBuffers.ProtoGen
             psi.UseShellExecute = false;
             psi.WorkingDirectory = Environment.CurrentDirectory;
 
-            Process process = Process.Start(psi);
-            if (process == null)
-            {
-                return 1;
-            }
-
+            var process = new Process() { StartInfo = psi };
+            string stdErr = "", stdOut = "";
+            process.OutputDataReceived += (sender, e) => { stdOut += e.Data + Environment.NewLine; };
+            process.ErrorDataReceived += (sender, e) => { stdErr += e.Data + Environment.NewLine; };
+            
+            process.Start();
+            
+            process.BeginOutputReadLine();
+            process.BeginErrorReadLine();
             process.WaitForExit();
-
-            string tmp = process.StandardOutput.ReadToEnd();
-            if (tmp.Trim().Length > 0)
+            
+            if (stdOut.Trim().Length > 0)
             {
-                Console.Out.WriteLine(tmp);
+                Console.Out.WriteLine(stdOut);
             }
-            tmp = process.StandardError.ReadToEnd();
-            if (tmp.Trim().Length > 0)
+            if (stdErr.Trim().Length > 0)
             {
                 // Replace protoc output with something more amenable to Visual Studio.
                 var regexMsvs = new Regex(@"(.*)\((\d+)\).* column=(\d+)\s*:\s*(.*)");
-                tmp = regexMsvs.Replace(tmp, "$1($2,$3): error CS9999: $4");
+                stdErr = regexMsvs.Replace(stdErr, "$1($2,$3): error CS9999: $4");
                 var regexGcc = new Regex(@"(.*):(\d+):(\d+):\s*(.*)");
-                tmp = regexGcc.Replace(tmp, "$1($2,$3): error CS9999: $4");
-                Console.Error.WriteLine(tmp);
+                stdErr = regexGcc.Replace(stdErr, "$1($2,$3): error CS9999: $4");
+                Console.Error.WriteLine(stdErr);
             }
             return process.ExitCode;
         }
